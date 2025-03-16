@@ -8,6 +8,7 @@ local camera = workspace.CurrentCamera
 local flightDirection = Vector3.new(0, 0, 0)
 local currentVelocity = Vector3.new(0, 0, 0)
 local bodyVelocity, bodyGyro
+local isKeyPressed = {}  -- Armazenar o estado das teclas pressionadas
 
 -- Função para configurar voo ao reaparecer
 local function setupCharacter(character)
@@ -49,9 +50,6 @@ local function toggleFly()
         bodyVelocity.Parent = humanoidRootPart
         bodyGyro.Parent = humanoidRootPart
         humanoid.PlatformStand = true
-        
-        -- Resetar direção de voo ao ativar o voo para evitar movimento indesejado
-        flightDirection = Vector3.new(0, 0, 0)
     else
         print("Voo desativado")
         bodyVelocity.Parent = nil
@@ -71,35 +69,50 @@ end
 -- Detectar entrada de teclas
 userInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.V then toggleFly()
-    elseif input.KeyCode == Enum.KeyCode.W then flightDirection = flightDirection + Vector3.new(0, 0, -1)
-    elseif input.KeyCode == Enum.KeyCode.S then flightDirection = flightDirection + Vector3.new(0, 0, 1)
-    elseif input.KeyCode == Enum.KeyCode.A then flightDirection = flightDirection + Vector3.new(-1, 0, 0)
-    elseif input.KeyCode == Enum.KeyCode.D then flightDirection = flightDirection + Vector3.new(1, 0, 0)
-    elseif input.KeyCode == Enum.KeyCode.Space then flightDirection = flightDirection + Vector3.new(0, 1, 0)
-    elseif input.KeyCode == Enum.KeyCode.LeftShift then flightDirection = flightDirection + Vector3.new(0, -1, 0)
-    elseif input.KeyCode == Enum.KeyCode.Z then adjustSpeed(-20)
-    elseif input.KeyCode == Enum.KeyCode.X then adjustSpeed(20) end
+    
+    -- Ativa o voo ao pressionar a tecla V
+    if input.KeyCode == Enum.KeyCode.V then
+        toggleFly()
+    elseif flying then
+        -- Se o voo estiver ativado e a tecla V não foi pressionada, registra os movimentos
+        if not isKeyPressed[input.KeyCode] then
+            isKeyPressed[input.KeyCode] = true
+            
+            if input.KeyCode == Enum.KeyCode.W then flightDirection = flightDirection + Vector3.new(0, 0, -1)
+            elseif input.KeyCode == Enum.KeyCode.S then flightDirection = flightDirection + Vector3.new(0, 0, 1)
+            elseif input.KeyCode == Enum.KeyCode.A then flightDirection = flightDirection + Vector3.new(-1, 0, 0)
+            elseif input.KeyCode == Enum.KeyCode.D then flightDirection = flightDirection + Vector3.new(1, 0, 0)
+            elseif input.KeyCode == Enum.KeyCode.Z then adjustSpeed(-20)
+            elseif input.KeyCode == Enum.KeyCode.X then adjustSpeed(20) end
+        end
+    end
 end)
 
+-- Detectar a saída de teclas (quando a tecla é solta)
 userInputService.InputEnded:Connect(function(input, gameProcessed)
     if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.W then flightDirection = flightDirection - Vector3.new(0, 0, -1)
-    elseif input.KeyCode == Enum.KeyCode.S then flightDirection = flightDirection - Vector3.new(0, 0, 1)
-    elseif input.KeyCode == Enum.KeyCode.A then flightDirection = flightDirection - Vector3.new(-1, 0, 0)
-    elseif input.KeyCode == Enum.KeyCode.D then flightDirection = flightDirection - Vector3.new(1, 0, 0)
-    elseif input.KeyCode == Enum.KeyCode.Space then flightDirection = flightDirection - Vector3.new(0, 1, 0)
-    elseif input.KeyCode == Enum.KeyCode.LeftShift then flightDirection = flightDirection - Vector3.new(0, -1, 0) end
+    
+    -- Se o voo estiver ativado, registra o "fim" do movimento
+    if flying then
+        if isKeyPressed[input.KeyCode] then
+            isKeyPressed[input.KeyCode] = nil
+
+            if input.KeyCode == Enum.KeyCode.W then flightDirection = flightDirection - Vector3.new(0, 0, -1)
+            elseif input.KeyCode == Enum.KeyCode.S then flightDirection = flightDirection - Vector3.new(0, 0, 1)
+            elseif input.KeyCode == Enum.KeyCode.A then flightDirection = flightDirection - Vector3.new(-1, 0, 0)
+            elseif input.KeyCode == Enum.KeyCode.D then flightDirection = flightDirection - Vector3.new(1, 0, 0) end
+        end
+    end
 end)
 
 -- Atualizar posição e rotação no voo
 runService.Heartbeat:Connect(function()
+    local character = player.Character
+    if not character then return end
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then return end
+    
     if flying then
-        local character = player.Character
-        if not character then return end
-        local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-        if not humanoidRootPart then return end
-        
         local cameraCFrame = camera.CFrame
         local moveDirection = cameraCFrame:VectorToWorldSpace(flightDirection)
         local targetVelocity = moveDirection.Unit * speed
@@ -108,6 +121,9 @@ runService.Heartbeat:Connect(function()
         end
         currentVelocity = currentVelocity:Lerp(targetVelocity, 0.1)
         bodyVelocity.Velocity = currentVelocity
-        bodyGyro.CFrame = CFrame.new(humanoidRootPart.Position, humanoidRootPart.Position + cameraCFrame.LookVector * Vector3.new(1, 0, 1))
+        bodyGyro.CFrame = CFrame.new(humanoidRootPart.Position, humanoidRootPart.Position + camera.CFrame.LookVector * Vector3.new(1, 0, 1))
+    else
+        -- Se o voo não estiver ativado, o personagem não vai se mover.
+        bodyVelocity.Velocity = Vector3.new(0, 0, 0)
     end
 end)
