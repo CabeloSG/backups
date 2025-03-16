@@ -49,6 +49,9 @@ local function toggleFly()
         bodyVelocity.Parent = humanoidRootPart
         bodyGyro.Parent = humanoidRootPart
         humanoid.PlatformStand = true
+        
+        -- Resetar direção de voo ao ativar o voo para evitar movimento indesejado
+        flightDirection = Vector3.new(0, 0, 0)
     else
         print("Voo desativado")
         bodyVelocity.Parent = nil
